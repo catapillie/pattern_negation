@@ -1,0 +1,8 @@
+(library
+ (name pmcomp))
+
+(ocamllex lexer)
+
+(menhir
+ (flags --dump)
+ (modules parser))
