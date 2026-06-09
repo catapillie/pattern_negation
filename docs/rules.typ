@@ -4,9 +4,11 @@
 = Inference rules for pattern-matching
 
 #let matches = $prec.eq$
-#let incomp = $prec.eq.not$
+#let incomp = $#h(.2em) hash #h(.2em)$
 
-Instead of defining a pattern-matching relation $p prec.eq v$ between patterns and values, we can define a relation $p matches q$ between patterns with syntactic rules. Intuitively, $p matches q$ means that $p$ is more general than $q$. This generalization makes sense because every value can be seen as a pattern. Because of pattern negation, we'll also have to give an inductive definition of $p incomp q$, the negation of $p matches q$
+Instead of defining a pattern-matching relation $p prec.eq v$ between patterns and values, we can define a relation $p matches q$ between patterns with syntactic rules. Intuitively, $p matches q$ means that $p$ is more general than $q$. This generalization makes sense because every value can be seen as a pattern.
+
+Because of pattern negation, we'll also have to handle the case for $not p matches q$, which is intuitively equivalent to the fact that $p$ and $q$ are _incompatible_, written $p incomp q$.
 
 #showybox[
   *$p matches q$*
@@ -71,6 +73,11 @@ Instead of defining a pattern-matching relation $p prec.eq v$ between patterns a
         $p incomp q$,
         $not p matches q$,
       )),
+
+      prooftree(rule(
+        $not p incomp not q$,
+        $p matches not q$,
+      )),
     ),
   )
 
@@ -103,31 +110,12 @@ Instead of defining a pattern-matching relation $p prec.eq v$ between patterns a
         $p_1 or p_2 incomp q$,
       )),
       prooftree(rule(
-        $p incomp q_1$,
-        $p incomp q_1 or q_2$,
-      )),
-      prooftree(rule(
-        $p incomp q_2$,
-        $p incomp q_1 or q_2$,
-      )),
-    ),
-  )
-
-  #align(
-    center,
-    rule-set(
-      prooftree(rule(
         $p_1 incomp q$,
         $p_1 and p_2 incomp q$,
       )),
       prooftree(rule(
         $p_2 incomp q$,
         $p_1 and p_2 incomp q$,
-      )),
-      prooftree(rule(
-        $p incomp q_1$,
-        $p incomp q_2$,
-        $p incomp q_1 and q_2$,
       )),
     ),
   )
@@ -137,6 +125,10 @@ Instead of defining a pattern-matching relation $p prec.eq v$ between patterns a
     rule-set(
       prooftree(rule(
         $p matches q$,
+        $not p incomp q$,
+      )),
+      prooftree(rule(
+        $q matches p$,
         $p incomp not q$,
       )),
     ),
@@ -144,4 +136,6 @@ Instead of defining a pattern-matching relation $p prec.eq v$ between patterns a
 
 ]
 
-*Theorem*. $matches$ is a preorder.
+*Theorem* $matches$ is reflexive and transitive.
+
+*Theorem* $hash$ is irreflexive and symmetric.
