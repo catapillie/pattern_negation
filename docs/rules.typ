@@ -110,12 +110,31 @@ Because of pattern negation, we'll also have to handle the case for $not p match
         $p_1 or p_2 incomp q$,
       )),
       prooftree(rule(
+        $p incomp q_1$,
+        $p incomp q_2$,
+        $p incomp q_1 or q_2$,
+      )),
+    ),
+  )
+
+  #align(
+    center,
+    rule-set(
+      prooftree(rule(
         $p_1 incomp q$,
         $p_1 and p_2 incomp q$,
       )),
       prooftree(rule(
         $p_2 incomp q$,
         $p_1 and p_2 incomp q$,
+      )),
+      prooftree(rule(
+        $p incomp q_1$,
+        $p incomp q_1 and q_2$,
+      )),
+      prooftree(rule(
+        $p incomp q_2$,
+        $p incomp q_1 and q_2$,
       )),
     ),
   )
@@ -138,4 +157,11 @@ Because of pattern negation, we'll also have to handle the case for $not p match
 
 *Theorem* $matches$ is reflexive and transitive.
 
+*Corollary* For all patterns $p$ and $q$ :
+$ p matches q space <==> space forall v, q matches v => p matches v $
+We claim this reformulation of the relation $matches$ is one that matches our intuition of patterns being more general than others, and more specifically if the right-hand side is restrained to values, then it _is_ the definition of pattern matching in @MARANGET_2007.
+
 *Theorem* $hash$ is irreflexive and symmetric.
+
+#pagebreak()
+#bibliography("references.bib")
