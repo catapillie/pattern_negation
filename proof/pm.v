@@ -72,12 +72,42 @@ Proof.
       ++ assumption.
 Qed.
 
-Lemma equiv_pat_not_not : forall p, equiv_pat (Pnot (Pnot p)) p.
+Lemma ge_notnot_l : forall p, ge_pat (Pnot (Pnot p)) p.
 Proof.
-  intro p. unfold equiv_pat.
-  split.
-  - constructor; constructor; apply ge_pat_refl.
-  - constructor; apply disj_rnot; apply ge_pat_refl.
+  constructor; constructor; apply ge_pat_refl.
+Qed.
+
+Lemma ge_notnot_r : forall p, ge_pat p (Pnot (Pnot p)).
+Proof.
+  constructor; apply disj_rnot; apply ge_pat_refl.
+Qed.
+
+Lemma ge_notand_ornot : forall p q, ge_pat (Pnot (Pand p q)) (Por (Pnot p) (Pnot q)).
+Proof.
+  constructor.
+  + constructor. apply disj_land_l. constructor. apply ge_pat_refl.
+  + constructor. apply disj_land_r. constructor. apply ge_pat_refl.
+Qed.
+
+Lemma ge_ornot_notand : forall p q, ge_pat (Por (Pnot p) (Pnot q)) (Pnot (Pand p q)).
+Proof.
+  intros. apply ge_rnot. apply disj_rnot. constructor.
+  + constructor. apply disj_rnot. apply ge_lor_l. apply ge_pat_refl.
+  + constructor. apply disj_rnot. apply ge_lor_r. apply ge_pat_refl.
+Qed.
+
+Lemma ge_notor_andnot : forall p q, ge_pat (Pnot (Por p q)) (Pand (Pnot p) (Pnot q)).
+Proof.
+  intros. apply ge_lnot. apply disj_lor.
+  + constructor; constructor; apply ge_pat_refl.
+  + constructor; constructor; apply ge_pat_refl.
+Qed.
+
+Lemma ge_andnot_notor : forall p q, ge_pat (Pand (Pnot p) (Pnot q)) (Pnot (Por p q)) .
+Proof.
+  constructor.
+  + constructor. constructor. apply ge_lor_l. apply ge_pat_refl.
+  + constructor. constructor. apply ge_lor_r. apply ge_pat_refl.
 Qed.
 
 Fixpoint disj_pat_sym : forall p q, disj_pat p q -> disj_pat q p
@@ -167,7 +197,7 @@ Proof.
   split. apply disj_pat_sym. trivial. apply disj_pat_sym. trivial.
 Qed.
 
-Lemma ge_and_destruct_l : forall p1 p2 q, ge_pat (Pand p1 p2) q -> ge_pat p1 q /\ ge_pat p2 q.
+Lemma ge_and_destruct_l : forall q p1 p2, ge_pat (Pand p1 p2) q -> ge_pat p1 q /\ ge_pat p2 q.
 Proof.
   intros. induction q.
   - inversion H. split. trivial. trivial.
@@ -178,7 +208,7 @@ Proof.
       split.
       constructor. trivial. trivial.
       constructor. trivial. trivial.
-    + split. trivial. trivial.
+    +  split. trivial. trivial.
   - inversion H.
     + split. trivial. trivial.
     + assert (ge_pat p1 q1 /\ ge_pat p2 q1). apply IHq1. trivial. destruct H4.
@@ -189,12 +219,7 @@ Proof.
       split.
       apply ge_rand_r. trivial.
       apply ge_rand_r. trivial.
-  - inversion H.
-    + split. trivial. trivial.
-    + assert (disj_pat (Por (Pnot p1) (Pnot p2)) (Pnot q)). admit.
-      apply disj_or_destruct_l in H3. destruct H3.
-      split. constructor. trivial.
-             constructor. trivial.
+  - admit.
 Admitted.
 
 Fixpoint ge_pat_trans : forall p q, ge_pat p q -> forall v, ge_pat q v -> ge_pat p v
