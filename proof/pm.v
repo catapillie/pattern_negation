@@ -99,10 +99,73 @@ Proof.
     + apply disj_ps_tl. trivial.
 Qed.
 
-Fixpoint ge_pat_trans : forall p q r, ge_pat p q -> ge_pat q r -> ge_pat p r
-    with ge_pats_trans : forall ps qs rs, ge_pats ps qs -> ge_pats qs rs -> ge_pats ps rs.
+Fixpoint ge_pat_trans : forall p q, ge_pat p q -> forall v, ge_pat q v -> ge_pat p v
+    with ge_pats_trans : forall ps qs, ge_pats ps qs -> forall vs, ge_pats qs vs -> ge_pats ps vs.
 Proof.
-  - admit. 
+  - intros p q Hpq.
+    induction Hpq.
+    + constructor.
+    + induction v.
+      ++ intro. inversion H0.
+      ++ intro. inversion H0.
+         constructor. apply (ge_pats_trans _ qs). trivial. trivial.
+      ++ intro. inversion H0.
+         constructor. apply IHv1; trivial. apply IHv2; trivial.
+      ++ intro. inversion H0.
+         apply ge_rand_l. apply IHv1; trivial.
+         apply ge_rand_r. apply IHv2; trivial.
+      ++ admit.
+    + intros. apply ge_lor_l. apply IHHpq. trivial.
+    + intros. apply ge_lor_r. apply IHHpq. trivial.
+    + intros. induction v.
+      ++ inversion H.
+         apply IHHpq1. trivial.
+         apply IHHpq2. trivial.
+      ++ inversion H.
+         apply IHHpq1. trivial.
+         apply IHHpq2. trivial.
+      ++ inversion H.
+         apply IHHpq1. trivial.
+         apply IHHpq2. trivial.
+         constructor.
+           apply IHv1. trivial.
+           apply IHv2. trivial.
+      ++ inversion H.
+         apply IHHpq1. trivial.
+         apply IHHpq2. trivial.
+         apply ge_rand_l. apply IHv1. trivial.
+         apply ge_rand_r. apply IHv2. trivial.
+      ++ admit.
+    + intros.
+      constructor.
+        apply IHHpq1. trivial.
+        apply IHHpq2. trivial.
+    + intros.  induction v.
+      ++ inversion H. apply IHHpq. trivial.
+      ++ inversion H. apply IHHpq. trivial.
+      ++ inversion H. constructor.
+          apply IHv1. trivial.
+          apply IHv2. trivial.
+         apply IHHpq. trivial.
+      ++ inversion H.
+         apply IHHpq. trivial.
+         apply ge_rand_l. apply IHv1. trivial.
+         apply ge_rand_r. apply IHv2. trivial.
+      ++ admit.
+    + intros. induction v.
+      ++ inversion H. apply IHHpq. trivial.
+      ++ inversion H. apply IHHpq. trivial.
+      ++ inversion H. constructor.
+          apply IHv1. trivial.
+          apply IHv2. trivial.
+         apply IHHpq. trivial.
+      ++ inversion H.
+         apply IHHpq. trivial.
+         apply ge_rand_l. apply IHv1. trivial.
+         apply ge_rand_r. apply IHv2. trivial.
+      ++ admit.
+    + admit.
+    + admit.
 
   - induction ps.
     + intros. inversion H.
@@ -111,7 +174,7 @@ Proof.
     + intros. inversion H.
       rewrite <- H4 in H0. inversion H0.
       constructor.
-      apply (ge_pat_trans p q q0). assumption. assumption.
+      apply (ge_pat_trans _ q). assumption. assumption.
       apply (IHps qs0). assumption. assumption.
 Admitted.
 

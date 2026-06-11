@@ -3,10 +3,10 @@
 
 = Inference rules for pattern-matching
 
-#let matches = $prec.eq$
+#let matches = $>=$
 #let incomp = $#h(.2em) hash #h(.2em)$
 
-Instead of defining a pattern-matching relation $p prec.eq v$ between patterns and values, we can define a relation $p matches q$ between patterns with syntactic rules. Intuitively, $p matches q$ means that $p$ is more general than $q$. This generalization makes sense because every value can be seen as a pattern.
+Instead of defining a pattern-matching relation $p succ.eq v$ between patterns and values, we can define a relation $p matches q$ between patterns with syntactic rules. Intuitively, $p matches q$ means that $p$ is more general than $q$. This generalization makes sense because every value can be seen as a pattern.
 
 Because of pattern negation, we'll also have to handle the case for $not p matches q$, which is intuitively equivalent to the fact that $p$ and $q$ are _incompatible_, written $p incomp q$.
 
