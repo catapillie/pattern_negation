@@ -6,14 +6,14 @@ Inductive pat :=
   | Por    : pat -> pat -> pat
   | Pand   : pat -> pat -> pat
   | Pnot   : pat -> pat
-  
-with pats := 
+
+with pats :=
   | PSnil : pats
   | PScons : pat -> pats -> pats.
 
 Inductive ge_pat : pat -> pat -> Prop :=
   | ge_l_omega : forall p, ge_pat Pomega p
-  
+
   | ge_ctor : forall c ps qs, ge_pats ps qs -> ge_pat (Pctor c ps) (Pctor c qs)
 
   | ge_lor_l : forall p1 p2 q, ge_pat p1 q -> ge_pat (Por p1 p2) q
@@ -26,12 +26,12 @@ Inductive ge_pat : pat -> pat -> Prop :=
 
   | ge_lnot : forall p q, disj_pat p q -> ge_pat (Pnot p) q
   | ge_rnot : forall p q, disj_pat (Pnot p) (Pnot q) -> ge_pat p (Pnot q)
-  
+
 with ge_pats : pats -> pats -> Prop :=
   | ge_ps_nil  : ge_pats PSnil PSnil
   | ge_ps_cons : forall p ps q qs, ge_pat p q -> ge_pats ps qs -> ge_pats (PScons p ps) (PScons q qs)
-  
-with disj_pat : pat -> pat -> Prop := 
+
+with disj_pat : pat -> pat -> Prop :=
   | disj_ctor : forall ca cb ps qs, ca <> cb -> disj_pat (Pctor ca ps) (Pctor cb qs)
   | disj_args : forall c ps qs, disj_pats ps qs -> disj_pat (Pctor c ps) (Pctor c qs)
 
@@ -45,7 +45,7 @@ with disj_pat : pat -> pat -> Prop :=
 
   | disj_lnot : forall p q, ge_pat p q -> disj_pat (Pnot p) q
   | disj_rnot : forall p q, ge_pat q p -> disj_pat p (Pnot q)
-  
+
 with disj_pats : pats -> pats -> Prop :=
   | disj_ps_hd : forall p ps q qs, disj_pat p q -> disj_pats (PScons p ps) (PScons q qs)
   | disj_ps_tl : forall p ps q qs, disj_pats ps qs -> disj_pats (PScons p ps) (PScons q qs).
@@ -98,6 +98,84 @@ Proof.
     + apply disj_ps_hd. apply disj_pat_sym. trivial.
     + apply disj_ps_tl. trivial.
 Qed.
+
+Fixpoint disj_or_destruct_l : forall p1 p2 q, disj_pat (Por p1 p2) q -> disj_pat p1 q /\ disj_pat p2 q
+    with ge_or_destruct_r : forall p q1 q2, ge_pat p (Por q1 q2) -> ge_pat p q1 /\ ge_pat p q2.
+Proof.
+  - intros. induction q.
+    + inversion H. split. trivial. trivial.
+    + inversion H. split. trivial. trivial.
+    + inversion H.
+      ++ split. trivial. trivial.
+      ++ split.
+         constructor.
+          assert (disj_pat p1 q1 /\ disj_pat p2 q1). apply IHq1. trivial. destruct H5. trivial.
+          assert (disj_pat p1 q2 /\ disj_pat p2 q2). apply IHq2. trivial. destruct H5. trivial.
+         constructor.
+          assert (disj_pat p1 q1 /\ disj_pat p2 q1). apply IHq1. trivial. destruct H5. trivial.
+          assert (disj_pat p1 q2 /\ disj_pat p2 q2). apply IHq2. trivial. destruct H5. trivial.
+    + inversion H.
+      ++ split. trivial. trivial.
+      ++ split.
+        apply disj_rand_l.
+        assert (disj_pat p1 q1 /\ disj_pat p2 q1). apply IHq1. trivial. destruct H4. trivial.
+        apply disj_rand_l.
+        assert (disj_pat p1 q1 /\ disj_pat p2 q1). apply IHq1. trivial. destruct H4. trivial.
+      ++ split.
+         apply disj_rand_r.
+          assert (disj_pat p1 q2 /\ disj_pat p2 q2). apply IHq2. trivial. destruct H4. trivial.
+         apply disj_rand_r.
+          assert (disj_pat p1 q2 /\ disj_pat p2 q2). apply IHq2. trivial. destruct H4. trivial.
+    + inversion H.
+      ++ split. trivial. trivial.
+      ++ split.
+         constructor. assert (ge_pat q p1 /\ ge_pat q p2). apply ge_or_destruct_r. trivial. destruct H3. trivial.
+         constructor. assert (ge_pat q p1 /\ ge_pat q p2). apply ge_or_destruct_r. trivial. destruct H3. trivial.
+
+  - induction p.
+    + split. constructor. constructor.
+    + intros. inversion H. split. trivial. trivial.
+    + intros. inversion H.
+      ++ split.
+        apply ge_lor_l.
+          assert (ge_pat p1 q1 /\ ge_pat p1 q2). apply IHp1. trivial.
+          destruct H4. trivial.
+        apply ge_lor_l.
+          assert (ge_pat p1 q1 /\ ge_pat p1 q2). apply IHp1. trivial.
+          destruct H4. trivial.
+      ++ split.
+        apply ge_lor_r.
+          assert (ge_pat p2 q1 /\ ge_pat p2 q2). apply IHp2. trivial.
+          destruct H4. trivial.
+        apply ge_lor_r.
+          assert (ge_pat p2 q1 /\ ge_pat p2 q2). apply IHp2. trivial.
+          destruct H4. trivial.
+      ++ split. trivial. trivial.
+    + intros. inversion H.
+      ++ split. trivial. trivial.
+      ++ split.
+        constructor.
+          assert (ge_pat p1 q1 /\ ge_pat p1 q2). apply IHp1. trivial.
+          destruct H5. trivial.
+          assert (ge_pat p2 q1 /\ ge_pat p2 q2). apply IHp2. trivial.
+          destruct H5. trivial.
+        constructor.
+          assert (ge_pat p1 q1 /\ ge_pat p1 q2). apply IHp1. trivial.
+          destruct H5. trivial.
+          assert (ge_pat p2 q1 /\ ge_pat p2 q2). apply IHp2. trivial.
+          destruct H5. trivial.
+    + intros. inversion H.
+      ++ split. trivial. trivial.
+      ++ assert (disj_pat q1 p /\ disj_pat q2 p).
+                apply disj_or_destruct_l. apply disj_pat_sym. trivial.
+                destruct H3.
+         split.
+          constructor. apply disj_pat_sym; trivial.
+          constructor. apply disj_pat_sym; trivial.
+Qed.
+
+
+
 
 Fixpoint ge_pat_trans : forall p q, ge_pat p q -> forall v, ge_pat q v -> ge_pat p v
     with ge_pats_trans : forall ps qs, ge_pats ps qs -> forall vs, ge_pats qs vs -> ge_pats ps vs.
