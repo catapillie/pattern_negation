@@ -50,13 +50,13 @@ Matrices are a natural object to consider when compared to the usual syntax for 
     ```
     #colbreak()
     #v(.6cm)
-    $xarrow(#h(5em) "after unwrapping the pair constructor" #h(5em))$
+    $xarrow(#h(5em) "after unwrapping the 'pair' constructor" #h(5em))$
     #colbreak()
     $
       mat(
         #raw("Some") omega, , omega;
         omega, , #raw("Some") omega;
-        #raw("None"), space, #raw("None")
+        #raw("None"), , #raw("None")
       )
     $
   ]
@@ -71,19 +71,19 @@ $
   ) & = mat(
         #raw("Some") omega, , omega;
         omega, , #raw("Some") omega;
-        #raw("None"), space, #raw("None")
-      ) or mat(#raw("None"), space, #raw("None")) \
-    & = mat(#raw("Some") omega, , omega) or mat(omega, , #raw("Some") omega) or mat(#raw("None"), space, #raw("None"))
+        #raw("None"), , #raw("None")
+      ) or mat(#raw("None"), , #raw("None")) \
+    & = mat(#raw("Some") omega, , omega) or mat(omega, , #raw("Some") omega) or mat(#raw("None"), , #raw("None"))
 $
 
-This operation is arbitrarily taken to be left-associative so as to be easier to understand, but swapping rows in a matrix won't change the set of matched values for set reunion is commutative. This is not true however when we consider how pattern-matching is how pattern-matching is evaluated. As we will see, this point is irrelevant to pattern-matching analysis.
+This operation is arbitrarily taken to be left-associative so as to be easier to understand, but swapping rows in a matrix won't change the set of matched values for set reunion is commutative. This is not true however when we consider how pattern-matching is evaluated. As we will see, this point is irrelevant to pattern-matching analysis.
 
 Finally, for two matrices of same width $bold(P)$ and $bold(Q)$, we also need to consider $bold(P) and bold(Q)$ as a matrix matching values $v$ that match $bold(P)$ and $bold(Q)$ simultaneously. This can be computed by taking a cartesian product of the rows of each matrix, and merging rows by distributing the $and$ operator. For instance :
 $
   mat(1, 2; 3, 4) and mat(5, 6; 7, 8; 9, 10) = mat(1 and 5, 2 and 6; 3 and 5, 4 and 6; 1 and 7, 2 and 8; 3 and 7, 4 and 8; 1 and 9, 2 and 10; 3 and 9, 4 and 10)
 $
 
-Again, the order in which the rows are inserted does not matter in this context. Notice how this definition is compatible with "singleton" matrices of size $1 times 1$ : we land back on the $and$-pattern.
+Again, the order in which the rows are inserted does not matter in this context. Notice how this definition is compatible with "singleton" matrices of size $1 times 1$ : it is the $and$-pattern construction.
 
 === Typing
 
@@ -289,10 +289,67 @@ $
   not not p slash A & = p slash A
 $
 
-We now have a more practical lemma for partitioning the space of values matched by a pattern $p$ with type $tau$.
+*Theorem* For all type $tau$, all constructor $A "of" row(alpha)$ the recursive definition above satisfies the desired property :
+$ forall v, forall p, #h(0.75cm) A(row(v)) matches p : tau space <==> space row(v) matches p slash A : row(alpha) $
 
-*Pattern decomposition lemma* $ sem(p, tau) = union.big.sq_(A in "sig" tau) sem(A(p slash A), tau) $
-where $A mat(row(p)_1; dots.v; row(p)_m)$ = $A(row(p)_1) or dots.c or A(row(p)_m)$.
+As we will also need to specialize entires rows and matrices, let us extend specialization by $(A "of" mat(tau_1, dots.c, tau_n)) in "sig" tau$ to general matrices : for each row in the matrix, we only specialize the first row, leaving the rest unchanged, and then we concatenate the results vertically (in the sense of $or$). That is, we thus have
+$
+  mat(p_1, row(p)'_1; dots.v, dots.v; p_m, row(p)'_m) slash A = mat((p_1 slash A), row(p)'_1; dots.v, dots.v; (p_m slash A), row(p)'_m)
+$
+If $bold(P)$ is of width $n$ and $A$ of arity $k$, then $bold(P) slash A$ will be of width $k+n-1$. For example, with a constructor $(#raw("Pair") "of" #raw("int"), #raw("int"))$, we'd have
+$
+  mat(
+    #raw("Pair")\(1\, 2\), 3;
+    not#raw("Pair")\(1\, 2\), 4;
+    B(2), omega
+  ) slash #raw("Pair") = mat(1, 2, 3; not 1, omega, 4; omega, not 2, 4)
+$
+
+Finally, for convenience, we define a "reciprocal" operation which takes a matrix $bold(P)$ of with at least $k$ and wraps the $k$ first columns back into the constructor $A$, which we simply note $A(bold(P))$ since it generalizes constructor patterns $A(row(p))$. If $row(p)_1, ..., row(p)_m$ are of width $k$, then
+$
+  A mat(row(p)_1, row(p)'_1; dots.v, dots.v; row(p)_m, row(p)'_m) = mat(A(row(p)_1), row(p)'_1; dots.v, dots.v; A(row(p)_m), row(p)'_m)
+$
+
+
+We now have a more practical and more general lemma for partitioning the space of values matched by a _matrix_ $bold(P)$ with types $row(tau) = mat(tau_1, dots.c, tau_n)$.
+
+*Pattern decomposition lemma* $ sem(bold(P), row(tau)) = union.big.sq_(A in "sig" tau_1) sem(A(bold(P) slash A), row(tau)) $
+
+This almost gives us an algorithm to decompose the set of values matched by a matrix as a distinct sum over a complete signature : if $"sig" tau_1$ is infinite, then we still have an infinite loop in our decomposition algorithm that we need to address. Thankfully, the matrices we consider are of finite size. If we look at the first column of a matrix $bold(P)$, we can register every constructor that appears as the head of a pattern, and deduce useful information about $sem(bold(P), row(tau))$.
+
+Because of negation patterns, it will be necessary to know when a constructor appears _negatively_ : when it is nested inside a $not$-pattern (modulo parity).
+
+For a pattern $p$, we construct two sets $S^+(p)$ and $S^-(p)$ of positive and negative head constructor respectively. They are defined by induction on $p$, the definition is immediate :
+$
+        S^+(omega) & = empty                   &       #h(1cm) S^-(omega) & = empty \
+    S^+(A(row(p))) & = {A}                     &   #h(1cm) S^-(A(row(p))) & = {A} \
+   S^+(p_1 or p_2) & = S^+(p_1) union S^+(p_2) &  #h(1cm) S^-(p_1 or p_2) & = S^-(p_1) union S^-(p_2) \
+  S^+(p_1 and p_2) & = S^+(p_1) inter S^+(p_2) & #h(1cm) S^-(p_1 and p_2) & = S^-(p_1) inter S^-(p_2) \
+        S^+(not p) & = S^-(p)                  &       #h(1cm) S^-(not p) & = S^+(p) \
+$
+
+The above definition is immediately extended to matrices (and rows) by only looking at the first column :
+$
+  S^+mat(p_1, row(p)'_1; dots.v, dots.v; p_m, row(p)'_m) = union.big_(1<=j<=m) S^+(p_j) #h(2cm) S^-mat(p_1, row(p)'_1; dots.v, dots.v; p_m, row(p)'_m) = union.big_(1<=j<=m) S^-(p_j)
+$
+
+There are two cases we then consider :
+- if $S(bold(P)) = S^+(bold(P)) union S^-(bold(P))$ turns out to be the complete signature of $tau_1$, i.e. when $"sig" tau_1 = S(bold(P))$, then the signature is finite and there is nothing to change as the loop is already finite.
+  $ sem(bold(P), row(tau)) = underbrace(union.big.sq_(A in S(bold(P))) sem(A(bold(P) slash A), row(tau)), "finite") $
+- if not, then we know we've missed at least one constructor $E in "sig" tau_1 \\ S(bold(P))$. First, we split the loop over $"sig" tau_1$ into two parts :
+  $
+    sem(bold(P), row(tau)) = underbrace((union.big.sq_(A in S(bold(P))) sem(A(bold(P) slash A,), row(tau))), "finite") space union.sq space underbrace((union.big.sq_(A in "sig" tau_1 \\ S(bold(P))) sem(A(bold(P) slash A), row(tau))), "nonempty loop")
+  $
+  By reasoning over values matched by $bold(P)$ whose head constructor $C$ is not in $S(bold(P))$, we find that specializing $bold(P)$ by $C$ always yield a matrix whose first columns are only made up of wildcard patterns. Indeed, $C$ does not appear in the first column of $bold(P)$, so it is only unwrapped when specializing a pattern $not A(...)$ with $A != C$. We can then deduce that the second loop can be entirely simplified to a single specialization, which we do by constructor $E$.
+  $
+    sem(bold(P), row(tau)) = underbrace((union.big.sq_(A in S(bold(P))) sem(A(bold(P) slash A,), row(tau))), "finite") space union.sq space sem(E(bold(P) slash E), row(tau))
+  $
+
+  This gives us another finite-loop decomposition. The rightmost matrix is usually called the "_default matrix_" in the literature, which can be thought of a matrix matching the values whose head constructor does not appear in the first column of $bold(P)$. It can be computed by specializing against a fresh constructor $E$.
+
+
+
+
 
 #pagebreak()
 == Usefulness and exhaustivity
