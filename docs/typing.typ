@@ -175,7 +175,7 @@ We now consider _typed pattern-matching_ as a relation between values, patterns 
       prooftree(rule(
         $v matches p_1 : tau$,
         $v matches p_2 : tau$,
-        $v matches p_1 or p_2 : tau$,
+        $v matches p_1 and p_2 : tau$,
       )),
     ),
   )
@@ -185,12 +185,18 @@ We now consider _typed pattern-matching_ as a relation between values, patterns 
     rule-set(
       prooftree(rule(
         $exists i, v_i matches not p_i : tau_i$,
-        $(A "of" tau_1, ..., tau_n) in "sig" tau$,
+        $v_1 : tau_1$,
+        $dots.c$,
+        $v_n : tau_n$,
+        $(A "of" tau_1, dots.c, tau_n) in "sig" tau$,
         $A(v_1, ..., v_n) matches not A(p_1, ..., p_n) : tau$,
       )),
       prooftree(rule(
         $A != B$,
-        $A, B in "sig" tau$,
+        $v_1 : tau_1$,
+        $dots.c$,
+        $v_n : tau_n$,
+        $A, (B "of" tau_1, dots.c, tau_n) in "sig" tau$,
         $B(v_1, ..., v_m) matches not A(p_1, ..., p_n) : tau$,
       )),
     ),
@@ -315,7 +321,7 @@ We now have a more practical and more general lemma for partitioning the space o
 
 *Pattern decomposition lemma* $ sem(bold(P), row(tau)) = union.big.sq_(A in "sig" tau_1) sem(A(bold(P) slash A), row(tau)) $
 
-This almost gives us an algorithm to decompose the set of values matched by a matrix as a distinct sum over a complete signature : if $"sig" tau_1$ is infinite, then we still have an infinite loop in our decomposition algorithm that we need to address. Thankfully, the matrices we consider are of finite size. If we look at the first column of a matrix $bold(P)$, we can register every constructor that appears as the head of a pattern, and deduce useful information about $sem(bold(P), row(tau))$.
+This almost gives us an algorithm to decompose the set of values matched by a matrix as a distinct sum over a complete signature. Yet, if $"sig" tau_1$ is infinite, then we still have an infinite loop in our decomposition algorithm that we need to address. Thankfully, the matrices we consider are of finite size. If we look at the first column of a matrix $bold(P)$, we can register every constructor that appears as the head of a pattern, and deduce valuable information about $sem(bold(P), row(tau))$.
 
 Because of negation patterns, it will be necessary to know when a constructor appears _negatively_ : when it is nested inside a $not$-pattern (modulo parity).
 
@@ -328,13 +334,13 @@ $
         S^+(not p) & = S^-(p)                  &       #h(1cm) S^-(not p) & = S^+(p) \
 $
 
-The above definition is immediately extended to matrices (and rows) by only looking at the first column :
+The above definition is extended to matrices (and rows) by only looking at the first column :
 $
   S^+mat(p_1, row(p)'_1; dots.v, dots.v; p_m, row(p)'_m) = union.big_(1<=j<=m) S^+(p_j) #h(2cm) S^-mat(p_1, row(p)'_1; dots.v, dots.v; p_m, row(p)'_m) = union.big_(1<=j<=m) S^-(p_j)
 $
 
 There are two cases we then consider :
-- if $S(bold(P)) = S^+(bold(P)) union S^-(bold(P))$ turns out to be the complete signature of $tau_1$, i.e. when $"sig" tau_1 = S(bold(P))$, then the signature is finite and there is nothing to change as the loop is already finite.
+- if $S(bold(P)) = S^+(bold(P)) union S^-(bold(P))$ turns out to be the _complete signature_ of $tau_1$, i.e. when $"sig" tau_1 = S(bold(P))$, then the signature is finite and there is nothing to change as the loop is already finite.
   $ sem(bold(P), row(tau)) = underbrace(union.big.sq_(A in S(bold(P))) sem(A(bold(P) slash A), row(tau)), "finite") $
 - if not, then we know we've missed at least one constructor $E in "sig" tau_1 \\ S(bold(P))$. First, we split the loop over $"sig" tau_1$ into two parts :
   $
@@ -345,30 +351,64 @@ There are two cases we then consider :
     sem(bold(P), row(tau)) = underbrace((union.big.sq_(A in S(bold(P))) sem(A(bold(P) slash A,), row(tau))), "finite") space union.sq space sem(E(bold(P) slash E), row(tau))
   $
 
-  This gives us another finite-loop decomposition. The rightmost matrix is usually called the "_default matrix_" in the literature, which can be thought of a matrix matching the values whose head constructor does not appear in the first column of $bold(P)$. It can be computed by specializing against a fresh constructor $E$.
+  This gives us another finite-loop decomposition. The rightmost matrix is usually called the "_default matrix_" in the literature, which can be thought of a matrix matching the values whose head constructor does not appear in the first column of $bold(P)$. It can be computed by specializing against a fresh constructor $E$, whose arity doesn't matter (the new columns created by specialization are all wildcards).
 
-
-
-
-
-#pagebreak()
 == Usefulness and exhaustivity
+
+=== Introduction
 
 The _pattern-matching exhaustivity_ problem goes as follows : for a pattern matrix $bold(P)$ and a types $row(tau)$, is it true that $ forall row(v), space row(v) : row(tau) space ==> space row(v) matches bold(P) : row(tau) $
 Let us denote this property $cal(E)_(row(tau))(bold(P))$
 
-In order to solve pattern-matching exhaustivity, we answer a more general problem : _pattern usefulness_. For a type row $row(tau)$, a matrix $bold(P)$ and a pattern row $bold(q)$, it is denoted $cal(U)_(row(tau))(bold(P), row(q))$ and asks whether the pattern $q$ is "useful" next to matrix $bold(P)$, i.e. does it catch any value row that did not match $bold(P)$. Formally :
+In order to solve pattern-matching exhaustivity, we answer a more general problem : _pattern usefulness_. For a type row $row(tau)$, and two matrices $bold(P)$ and $bold(Q)$, it is denoted $cal(U)_(row(tau))(bold(P), bold(Q))$ and asks whether the matrix $bold(Q)$ is "useful" next to $bold(P)$, i.e. does it catch any value row that did not match $bold(P)$. Formally :
 $
-  cal(U)_(row(tau))(bold(P), row(q)) := exists row(v) : row(tau) | row(v) matches row(q) : row(tau) "and" row(v) mismatches bold(P) : row(tau)
+  cal(U)_(row(tau))(bold(P), bold(Q)) := exists row(v) : row(tau) | row(v) matches bold(Q) : row(tau) "and" row(v) mismatches bold(P) : row(tau)
 $
 
 This property can be reformulated using pattern-matching semantics :
-$ cal(U)_(row(tau))(bold(P), row(q)) space <==> space sem(row(q), row(tau)) \\ sem(bold(P), row(tau)) != diameter $
+$ cal(U)_(row(tau))(bold(P), bold(Q)) space <==> space sem(bold(Q), row(tau)) \\ sem(bold(P), row(tau)) != diameter $
 
 Pattern-matching exhaustivity is now a special case of usefulness : $bold(P)$ is exhaustive iff $omegas(n)$ is useless.
 $
   cal(E)_(row(tau))(bold(P)) space & <==> space not cal(U)_(row(tau))(bold(P), omegas(n)) \
-                                   & <==> space sem(bold(P), row(tau)) = V(row(tau))
+                                   & <==> space sem(bold(P), row(tau)) = sem(omegas(n), row(tau))
 $
 
-Pattern usefulness is also useful #emoji.face.tongue in a typechecker when we analyse a #raw("match", lang: "ocaml") expression and want to find redundant clauses : we simply ask whether a clause is useful with respect to the matrixc that precedes it. If not then it is redundant.
+Pattern usefulness is also useful #emoji.face.tongue in a typechecker when we analyse a #raw("match", lang: "ocaml") expression and want to find redundant clauses : we simply ask whether a clause is useful with respect to the matrix that precedes it. If not then it is redundant.
+
+=== Solving usefulness recursively
+
+Thanks to our decomposition lemmas, we can derive an algorithm to determine whether $cal(U)_(row(tau))(bold(P), bold(Q))$ is true. We work throughout this section with a type row $row(tau) = mat(tau_1, dots.c, tau_n)$.
+
+- There are two "easy" base cases :
+  - if $bold(P) = empty$ (no rows), then no value is forbidden, and we need to ensure that there exists a row in $bold(Q)$ that matches at least one value. In short, we say
+  $ cal(U)_(row(tau))(empty, bold(Q)) <==> sem(bold(Q), row(tau)) != empty $
+
+  - if $bold(P)$ and $bold(Q)$ are of width zero (they are unit matrices) and nonempty, then $sem(bold(P), unit) = sem(omega, unit)$, thus $bold(P)$ is exhaustive and $bold(Q)$ can match no more (unit) values. Hence : $ cal(U)_(row(tau))(unit, unit) <==> bot $
+
+- Otherwise, we need to perform recursive calls depending on what we find in the first column $bold(Q)$. First, we "desugar" $or$,$and$,$not$-patterns as new rows according to the following rules, which we apply iteratively until we are stuck :
+  1. or-patterns are destructed as two new rows in $bold(Q)$
+    $
+      cal(U)_(row(tau))(bold(P), bold(Q) or mat((q_1 or q_2), row(q)')) <==> cal(U)_(row(tau))(bold(P), bold(Q) or mat(q_1, row(q)') or mat(q_2, row(q)'))
+    $
+
+  2. and-patterns are rewritten using De Morgan rules
+    $
+      cal(U)_(row(tau))(bold(P), bold(Q) or mat((q_1 and q_2), row(q)')) <==> cal(U)_(row(tau))(bold(P), bold(Q) or mat(not q_1, row(q)') or mat(not q_2, row(q)'))
+    $
+
+  3. not-patterns are eliminated by forbidding the inner pattern, i.e. it becomes a new row in $bold(P)$
+    $
+      cal(U)_(row(tau))(bold(P), bold(Q) or mat(not q, row(q)')) <==> cal(U)_(row(tau))(bold(P) or q, bold(Q) or mat(omega, row(q)'))
+    $
+
+  Now, we need to decompose the space of values matched by $bold(Q) \\ bold(P)$. Because of the pre-treatment done on $bold(Q)$, its first column contains no constructor in a negative position.
+  - If $S(bold(Q))$ is a complete signature, then
+    $
+      sem(bold(Q), row(tau)) \\ sem(bold(P), row(tau)) &= (union.big.sq_(A in S(bold(Q))) sem(A(bold(Q) slash A), row(tau))) \\ sem(bold(P), row(tau)) \ &= union.big.sq_(A in S(bold(Q))) sem(A(bold(Q) slash A), row(tau)) \\ sem(bold(P), row(tau)) \ &= union.big.sq_(A in S(bold(Q))) sem(A(bold(Q) slash A), row(tau)) \\ sem(A(bold(P) slash A), row(tau))
+    $
+    so we return
+    $ cal(U)_(row(tau))(bold(P), bold(Q)) <==> or.big_(A in S(bold(Q))) cal(U)_(row(tau) slash A)(bold(P) slash A, bold(Q) slash A) $
+    where, if $(A "of" mu_1, ..., mu_k) in "sig" tau_1$, then $row(tau) slash A = mat(mu_1, dots.c, mu_k, tau_2, dots.c, tau_n)$.
+
+  - otherwise $S(bold(Q))$ is incomplete, and we also have $S^-(bold(Q)) = empty$. 
