@@ -384,31 +384,41 @@ Thanks to our decomposition lemmas, we can derive an algorithm to determine whet
   - if $bold(P) = empty$ (no rows), then no value is forbidden, and we need to ensure that there exists a row in $bold(Q)$ that matches at least one value. In short, we say
   $ cal(U)_(row(tau))(empty, bold(Q)) <==> sem(bold(Q), row(tau)) != empty $
 
-  - if $bold(P)$ and $bold(Q)$ are of width zero (they are unit matrices) and nonempty, then $sem(bold(P), unit) = sem(omega, unit)$, thus $bold(P)$ is exhaustive and $bold(Q)$ can match no more (unit) values. Hence : $ cal(U)_(row(tau))(unit, unit) <==> bot $
+  - if $bold(P)$ and $bold(Q)$ are of width zero (they are unit matrices) and $bold(P) != empty$, then $sem(bold(P), unit) = sem(omegas(0), unit)$, thus $bold(P)$ is exhaustive and $bold(Q)$ can match no more (unit) values. Hence : $ cal(U)_(row(tau))(unit, unit) <==> bot $
 
-- Otherwise, we need to perform recursive calls depending on what we find in the first column $bold(Q)$. First, we "desugar" $or$,$and$,$not$-patterns as new rows according to the following rules, which we apply iteratively until we are stuck :
-  1. or-patterns are destructed as two new rows in $bold(Q)$
+  - In any other case, we need to apply the decomposition lemma on what we think the pattern matrix $bold(Q) \\ bold(P)$ is. If $S(bold(P)) union S(bold(Q))$ is a complete signature, then the set of matched values is decomposed like so :
     $
-      cal(U)_(row(tau))(bold(P), bold(Q) or mat((q_1 or q_2), row(q)')) <==> cal(U)_(row(tau))(bold(P), bold(Q) or mat(q_1, row(q)') or mat(q_2, row(q)'))
-    $
-
-  2. and-patterns are rewritten using De Morgan rules
-    $
-      cal(U)_(row(tau))(bold(P), bold(Q) or mat((q_1 and q_2), row(q)')) <==> cal(U)_(row(tau))(bold(P), bold(Q) or mat(not q_1, row(q)') or mat(not q_2, row(q)'))
+      sem(bold(Q), row(tau)) \\ sem(bold(P), row(tau)) &= (union.sq.big_(A in S(bold(P)) union S(bold(Q))) sem(A(bold(Q) slash A), row(tau))) \\ sem(bold(P), row(tau)) \
+      &= union.sq.big_(A in S(bold(P)) union S(bold(Q))) sem(A(bold(Q) slash A), row(tau)) \\ sem(A(bold(P) slash A), row(tau))
     $
 
-  3. not-patterns are eliminated by forbidding the inner pattern, i.e. it becomes a new row in $bold(P)$
-    $
-      cal(U)_(row(tau))(bold(P), bold(Q) or mat(not q, row(q)')) <==> cal(U)_(row(tau))(bold(P) or q, bold(Q) or mat(omega, row(q)'))
-    $
+  hence usefulness is rewritten as :
+  $
+    cal(U)_row(tau)(bold(P), bold(Q)) <==> or.big_(A in S(bold(P)) union S(bold(Q))) cal(U)_(row(tau) slash A)(bold(P) slash A, bold(Q) slash A)
+  $
 
-  Now, we need to decompose the space of values matched by $bold(Q) \\ bold(P)$. Because of the pre-treatment done on $bold(Q)$, its first column contains no constructor in a negative position.
-  - If $S(bold(Q))$ is a complete signature, then
-    $
-      sem(bold(Q), row(tau)) \\ sem(bold(P), row(tau)) &= (union.big.sq_(A in S(bold(Q))) sem(A(bold(Q) slash A), row(tau))) \\ sem(bold(P), row(tau)) \ &= union.big.sq_(A in S(bold(Q))) sem(A(bold(Q) slash A), row(tau)) \\ sem(bold(P), row(tau)) \ &= union.big.sq_(A in S(bold(Q))) sem(A(bold(Q) slash A), row(tau)) \\ sem(A(bold(P) slash A), row(tau))
-    $
-    so we return
-    $ cal(U)_(row(tau))(bold(P), bold(Q)) <==> or.big_(A in S(bold(Q))) cal(U)_(row(tau) slash A)(bold(P) slash A, bold(Q) slash A) $
-    where, if $(A "of" mu_1, ..., mu_k) in "sig" tau_1$, then $row(tau) slash A = mat(mu_1, dots.c, mu_k, tau_2, dots.c, tau_n)$.
+  Otherwise, we need one extra term.
+  $
+    sem(bold(Q), row(tau)) \\ sem(bold(P), row(tau))
+    &= union.sq.big_(A in S(bold(P)) union S(bold(Q))) sem(A(bold(Q) slash A), row(tau)) \\ sem(A(bold(P) slash A), row(tau)) #h(1em) union.sq #h(1em) sem(E(bold(Q) slash E), row(tau)) \\ sem(E(bold(P) slash E), row(tau))
+  $
 
-  - otherwise $S(bold(Q))$ is incomplete, and we also have $S^-(bold(Q)) = empty$. 
+  which gives
+  $
+    cal(U)_row(tau)(bold(P), bold(Q)) <==> or.big_(A in S(bold(P)) union S(bold(Q))) cal(U)_(row(tau) slash A)(bold(P) slash A, bold(Q) slash A) #h(1em) or #h(1em) cal(U)_(row(tau) slash E)(bold(P) slash E, bold(Q) slash E)
+  $
+
+  At this point, we have a recursive algorithm, but there is an optimization we can incorporate into this last case, which consists in performing less recursive calls. The idea is to only specialize against constructors which appear in $bold(Q)$ or _strictly negatively_ in $bold(P)$. Indeed, we need not to specialize against those who appear positively, since we already know that the signature is incomplete, and so the usefulness check may yield true anyway when specializing by the fresh constructor $E$. It is still required however to specialize against strictly negative constructors, since they may omit a value that could still be useful to $bold(P)$. Consider the following matrix $bold(P)$ as an example.
+  $ bold(P) = mat(1; not 2) $
+  By definition, we know that $cal(U)_#raw("int") (bold(P), 2)$ is true, since $2$ is unmatched by $P$. Our initial decomposition lemma tells us to perform three recursive calls, specializing by $1$, $2$ and $E$ respectively :
+  $
+    cal(U)_#raw("int") (bold(P), 2) space <==> space underbrace(cal(U)_unit (unit, empty), 1) space or space underbrace(cal(U)_unit (empty, unit), 2) space or space underbrace(cal(U)_unit (unit, unit), E)
+  $
+  Observe how the result equals $top$ because of the one recursive call specializing by constructor $2$. And if there are no strictly negative constructors, then we have for instance
+  $
+    cal(U)_#raw("int") (mat(1; 2), 3) space <==> space underbrace(cal(U)_unit (empty, unit), E) space <==> space top
+  $
+  with no need for other recursive calls, because the signature is incomplete, which means we can restrain our search to the default matrix. Hence the refined case :
+  $
+    cal(U)_row(tau)(bold(P), bold(Q)) <==> or.big_(A in S(bold(Q)) union (S^-(bold(P)) \\ S^+(bold(Q)))) cal(U)_(row(tau) slash A)(bold(P) slash A, bold(Q) slash A) #h(1em) or #h(1em) cal(U)_(row(tau) slash E)(bold(P) slash E, bold(Q) slash E)
+  $
