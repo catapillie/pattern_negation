@@ -44,6 +44,7 @@ sig A, B ;;
 switch
     case  (A | ~B(1, 2))
     case ~(A | ~B(1, 2))
+;;
 ```
 
 ### Behavior
@@ -52,4 +53,4 @@ Given a syntactically valid input, the program checks if the given pattern-match
 - `Pattern-matching is partial.`
 - `Pattern-matching is exhaustive.`
 
-The program then compiles the pattern-matching into a minimal "lambda-code"-style expression, similar to [OCaml's `lambda` IR](https://github.com/ocaml/ocaml/blob/trunk/lambda/lambda.mli). This output is not yet shown.
+The program then compiles the pattern-matching into a minimal "lambda-code"-style expression, similar to [OCaml's `lambda` IR](https://github.com/ocaml/ocaml/blob/trunk/lambda/lambda.mli). The output is then printed, after going through a naive optimization pass (for instance, by eliminating chains of the forl raise-catch-raise-... and so on).

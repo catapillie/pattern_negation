@@ -35,5 +35,6 @@ let () =
       else print_endline "Pattern-matching is exhaustive.";
       let pm = Compile.initial_pm ps in
       let var = Compile.initial_var in
-      let _l = Compile.translate pm [ var ] Lfailure in
+      let ir = Compile.translate pm [ var ] Lfailure |> Compile.simplify in
+      print_endline (Ast.display_lambda ir);
       print_endline "Done."

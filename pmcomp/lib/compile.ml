@@ -167,3 +167,33 @@ and translate_nonempty_or qs ps mat (var, vars) failure =
         translate ps_mat ps_vars (Lraise num_fail) )
   in
   Lcatch (body, num_fail, failure)
+
+let rec simplify (ir : lambda) : lambda =
+  let is_short = function
+    | Lfailure | Lsuccess _ | Lraise _ -> true
+    | Lswitch _ | Lcatch _ -> false
+  in
+  let rec sub_raise trap l = function
+    | Lraise trap' -> if trap = trap' then l else Lraise trap'
+    | Lfailure -> Lfailure
+    | Lsuccess i -> Lsuccess i
+    | Lswitch (v, cases, fallback) ->
+        let cases =
+          List.map (fun (c, act) -> (c, sub_raise trap l act)) cases
+        in
+        let fallback = sub_raise trap l fallback in
+        Lswitch (v, cases, fallback)
+    | Lcatch (body, trap', handler) ->
+        Lcatch (sub_raise trap l body, trap', sub_raise trap l handler)
+  in
+  match ir with
+  | Lcatch (body, trap, handler) when is_short handler ->
+      sub_raise trap handler body |> simplify
+  | Lcatch (body, trap, handler) ->
+      Lcatch (simplify body, trap, simplify handler)
+  | Lswitch (v, cases, fallback) ->
+      Lswitch
+        ( v,
+          List.map (fun (v, act) -> (v, simplify act)) cases,
+          simplify fallback )
+  | _ -> ir
