@@ -11,7 +11,8 @@ Usage:
 ### Syntax
 Patterns are terms defined with the following grammar
 ```
-p := C(p1, ..., pn)       (constructor) n>= 0
+p := _                    (wildcard)
+   | C(p1, ..., pn)       (constructor) n>= 0
    | ~p                   (negation)
    | p | q                (disjunction)
    | p & q                (conjunction)
@@ -51,4 +52,4 @@ Given a syntactically valid input, the program checks if the given pattern-match
 - `Pattern-matching is partial.`
 - `Pattern-matching is exhaustive.`
 
-The program then compiles the pattern-matching into a minimal "lambda-code"-style expression, similar to OCaml's `lambda` IR. This output is not yet shown.
+The program then compiles the pattern-matching into a minimal "lambda-code"-style expression, similar to [OCaml's `lambda` IR](https://github.com/ocaml/ocaml/blob/trunk/lambda/lambda.mli). This output is not yet shown.
