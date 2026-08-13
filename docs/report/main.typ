@@ -2,6 +2,7 @@
 #import "@preview/showybox:2.0.4": showybox
 #import "@preview/curryst:0.6.0": prooftree, rule, rule-set
 #import "@preview/xarrow:0.4.0": *
+#import "@preview/cetz:0.5.2"
 
 #show: report.with(
   title: [Adding pattern negation to ML-like matching],
@@ -11,7 +12,7 @@
   dep: "Département d'informatique",
 )
 
-#show raw: set text(font: "Maple Mono")
+#show raw: set text(font: "JetBrains Maple Mono")
 #show link: set text(blue)
 
 #let ocaml = smallcaps("OCaml")
@@ -40,9 +41,35 @@ Type-checking such a pattern-matching expression ensures that every branch accep
 
 == Objectives
 
-The main objective of this internship is to extend pattern-matching as seen in #ocaml with pattern negation : values matching a pattern #ml("not(p)") are exactly those who do not match the pattern #ml("p"). While such patterns are never truly necessary in #ocaml, they have the potential to allow for clearer code. Indeed, they allow to explicitly handle "unwanted" cases first in a defensive clause, then treat the rest as usual, as opposed to having a fallback clause necessarily laying at the end of the #ml("match") expression to handle the unwanted cases by exhaustion. Moreover, if we have a non-exhaustive #ml("match") expression, its negation describes the space of values unmatched by the expression.
+The main objective of this internship is to extend pattern-matching as seen in #ocaml with pattern negation : values matching a pattern #ml("not(p)") are exactly those who do not match the pattern #ml("p"). While such patterns are never truly necessary in #ocaml, they have the potential to allow for clearer code. Indeed, they allow to explicitly handle "unwanted" cases first in a defensive clause, then treat the rest as usual, as opposed to having a fallback clause laying at the end of the #ml("match") expression. Moreover, if we have a non-exhaustive #ml("match") expression, its negation describes the space of values unmatched by the expression. The following snippet is a simplified example found in real life code from the #ocaml compiler.
+#align(center)[
+  ```ocaml
+  match typ with
+  | Tpoly (ty, []) -> instance env ty
+  | Tpoly (ty, tl) -> snd (instance_poly false tl ty)
+  | Tvar _ ->
+      let ty' = newvar () in
+      unify env (instance_def typ) (newty (Tpoly (ty', [])));
+      ty'
+  | _ -> assert false
+  ```
+]
 
-Pattern negation is also a current feature wish on the official #ocaml GitHub repository, and in this intership we looked at how well this feature could be implemented in the language, with minimal impact on the preexisting code and performance of the compiler.
+Using pattern negation, we can handle the degenerate case first. The result expression conveys our intentions better, as we are directly able to read what the forbidden values are.
+#align(center)[
+  ```ocaml
+  match typ with
+  | not (Tpoly _ | Tvar _) -> assert false
+  | Tpoly (ty, []) -> instance env ty
+  | Tpoly (ty, tl) -> snd (instance_poly false tl ty)
+  | Tvar _ ->
+      let ty' = newvar () in
+      unify env (instance_def typ) (newty (Tpoly (ty', [])));
+      ty'
+  ```
+]
+
+Pattern negation is also a current feature wish on the official #ocaml GitHub repository. In this internship we looked at how well this feature could be implemented in the language, with minimal impact on the preexisting code and performance of the compiler.
 
 == Approach
 
@@ -61,12 +88,14 @@ A great number of elements described in the rest of the report heavily rely on t
 #let sig = $"sig"$
 #let empty = $emptyset$
 
-The problem of pattern-matching exhaustivity was already defined and studied in _Warnings for pattern matching_ @MARANGET_2007 in a publication which now serves as a canonical reference for pattern-matching analysis and compilation in the #ocaml compiler. We will work with a minimal abstract language consisting of _values_, _patterns_ and _types_. We do not describe what the types look like, but we assume to be able to retrieve their definitions as if they were introduced by an inductive data structure definition. Hence we first introduce an infinite set of constructors ${A, B, C_1, C_2, ...}$, which all have a fixed arity. Then we introduce the set of types $cal(T)$, and for any type $tau$ we claim to know what its _signature_ is : a signature is a set of constructors each equipped with as many type argument as their arity. The signature of a type $tau$ is written $sig(tau)$. For a constructor $C$ of arity $k$ and types $tau_1, ..., tau_k$, we can write $(C "of" tau_1, dots.c, tau_k) in sig(tau)$ to designate the type arguments of $C$ in the signature of $tau$, and sometimes omit the type arguments when we only care to know whether $C in sig(tau)$, or $C$ is of arity 0. Some common types in #ocaml would thus be modeled as :
+The problem of pattern-matching exhaustivity was already defined and studied in _Warnings for pattern matching_ @MARANGET_2007 in a publication which now serves as a canonical reference for pattern-matching analysis and compilation in the #ocaml compiler.
+
+We will work with a minimal abstract language consisting of _values_, _patterns_ and _types_. We do not describe what the types look like, but we assume to be able to retrieve their definitions as if they were introduced by an inductive data structure definition. Hence we first introduce an infinite set of constructors ${A, B, C_1, C_2, ...}$, which all have a fixed arity. Then we introduce the set of types $cal(T)$, and for any type $tau$ we claim to know what its _signature_ is : a signature is a set of constructors each equipped with as many type argument as their arity. The signature of a type $tau$ is written $sig(tau)$. For a constructor $C$ of arity $k$ and types $tau_1, ..., tau_k$, we can write $(C "of" tau_1, dots.c, tau_k) in sig(tau)$ to designate the type arguments of $C$ in the signature of $tau$, and sometimes omit the type arguments when we only care to know whether $C in sig(tau)$, or $C$ is of arity 0. Some common types in #ocaml would thus be modeled as :
 $
-  sig(ml("intlist")) &:= {(ml("Nil")), (ml("Cons") "of" ml("int"), ml("intlist"))} \
-  sig(ml("int")) &:= {dots.c, ml("-1"), ml("0"), ml("1"), dots.c} approx ZZ \
-  sig(ml("string")) &:= {ml("\"\""), ml("\"a\""), ml("\"b\""), dots.c, ml("\"aa\""), ml("\"ab\""), dots.c} approx sig(ml("char"))^* \
-  sig(ml("empty")) &:= empty #h(.5cm) "(the empty type)"
+  sig(ml("intlist")) & := {(ml("Nil")), (ml("Cons") "of" ml("int"), ml("intlist"))} \
+      sig(ml("int")) & := {dots.c, ml("-1"), ml("0"), ml("1"), dots.c} approx ZZ \
+   sig(ml("string")) & := {ml("\"\""), ml("\"a\""), ml("\"b\""), dots.c, ml("\"aa\""), ml("\"ab\""), dots.c} \
+    sig(ml("empty")) & := empty #h(.5cm) "(the empty type)"
 $
 
 Notice in the above examples how a signature might be infinite or sometimes empty. This presents a challenge when analyzing exhaustivity, because somehow we need to detect whether an infinite amount of values will always be handled by a pattern-matching expression, or conversely, when a pattern-matching is _useless_ for the type being matched over is empty.
@@ -83,7 +112,7 @@ $
     #text[*value*] v & := C(v_1, dots.c, v_k)         & #h(2cm) "constructor" C \
 $
 
-In a proper formal description for a programming language, we would except patterns to also contain a way to talk about variable patterns, so as to be able to bind values when a value matches a pattern, like #ml("Cons (_, xs)"). While they are essential  constructions within the context of compilation, they are totally irrelevant when it comes to pattern-matching exhaustivity analysis, and so we can assume every pattern has been stripped of its variables.
+In a proper formal description for a programming language, we would except patterns to also contain a way to talk about variable patterns, so as to be able to bind values when a value matches a pattern, like #ml("Cons (_, xs)"). While they are an essential element within the context of compilation, they are totally irrelevant when it comes to pattern-matching exhaustivity analysis, so we may assume every pattern has been stripped of its variables.
 
 #let row(x) = $arrow(#x)$
 #let unit = $mat()$
@@ -160,6 +189,7 @@ To simplify things a little with no loss of generality, we disallow the same con
 
 It is important to note that in #ocaml, the only way that typing intervenes in pattern-matching analysis is when we need to extract a full signature from a type. Other than this, @MARANGET_2007 makes the assumption that every pattern has at least one matching value, despite the contradictory existence of the empty type (#ml("type empty ;;")) which is explicitly ignored. We make an effort to bring back typing as part of pattern-matching semantics so that we are able to detect whenever a pattern-matching expression is trivially exhaustive.
 
+#pagebreak()
 == Semantics
 
 #let matches = $in$
@@ -264,7 +294,7 @@ We now consider _typed pattern-matching_ as a relation between values, patterns 
 
 Again, if we restrict our language of patterns to variables, constructors and "or"-patterns, the definition is pretty much identical to the way it is presented in @MARANGET_2007, except that we consider both pattern-matching _and_ typing at the same time. This change may seem of little use at first, but it unlocks a useful way to talk about types and patterns with respect to pattern-matching analysis.
 
-On the surface, extending this definition to "not"-patterns may seem simple enough given the very short intuitive definition. Yet, one quickly runs into all kinds of issues when trying to rigorously. Since we are defining the typed pattern-matching relation by induction, we cannot introduce a rule where a premise is negated. Our choice was to keep a single relation, and whenever we need to proove a judgment of the form $v matches not p : tau$, we destruct on $p$ again. Notice that when we have a non-trivial negation like $not (p or q)$ or $not (p and q)$, we essentially apply De Morgan's rules to define the pattern-matching relation.
+On the surface, extending this definition to "not"-patterns may seem simple enough given the very short intuitive definition. Yet, one quickly runs into all kinds of issues when trying to rigorously. Since we are defining the typed pattern-matching relation by induction, we cannot introduce a rule where the premise is negated. Our choice was to keep a single relation, and whenever we need to proove a judgment of the form $v matches not p : tau$, we destruct on $p$ again. Notice that when we have a non-trivial negation like $not (p or q)$ or $not (p and q)$, we essentially apply De Morgan's rules to define the pattern-matching relation.
 
 Pattern negation also introduces more difficulty with regards to exhaustivity analysis, as the programmer is now able to express _impossible_ patterns (those who match no values). Some obvious examples would be $not omega$ (negation of everything), or the conjunction of two different constructors like $ml("None") and ml("Some")$. Ideally, we would like the #ocaml compiler to warn us about these kind of patterns, with a message of the form "this pattern matches no values!". Finally, if we introduced back binding patterns into our language, one would realize variables cannot be bound if nested inside a #ml("not").
 
@@ -307,7 +337,7 @@ $
   mat(A(row(v_(1 i))), v_2, dots.c, v_n) matches bold(P) : mat(tau_1, dots.c, tau_n) space <==> space mat(row(v_(1 i)), v_2, dots.c, v_n) matches bold(P) slash A : mat(row(tau_(1 i)), tau_2, dots.c, tau_n)
 $
 
-This operation on matrices is called _specialization by $A$_, as per @MARANGET_2007, which described it by mapping each row to a new matrix, then flattening the result vertically as a new matrix. In order to define it ourselves with pattern negation, we first need to introduce some utility operations between matrices :
+This operation on matrices is called _specialization by $A$_, as seen in @MARANGET_2007, which described it by mapping each row to a new matrix, then flattening the result vertically as a new matrix. In order to define it ourselves with pattern negation, we first need to introduce some utility operations between matrices :
 - $bold(P) or bold(Q)$ stacks two matrices of the same with vertically. The choice of notation is coherent with the intuition that a value matching $bold(P) or bold(Q)$ will match at one of them.
 - $bold(P) and bold(Q)$, is similarly the matrix whose matching value rows are those of $bold(P)$ _and_ $bold(Q)$ simultaneously (again, these are of same width). We compute it by taking a cartesian product of the rows, then taking the conjunction of every pair of rows. The definition is illustrated by the example:
   $mat(1, 2; 3, 4) and mat(5, 6; 7, 8) = mat(1 and 5, 2 and 6; 3 and 5, 4 and 6; 1 and 7, 2 and 8; 3 and 7, 4 and 8)$.
@@ -368,7 +398,7 @@ $ sem(bold(P), row(tau)) = union.big.sq_(A in "sig" tau_1) sem(A(bold(P) slash A
 The _pattern-matching exhaustivity_ problem goes as follows : for a pattern matrix $bold(P)$ and a types $row(tau)$, do we have the following property? $ forall row(v), space row(v) : row(tau) space ==> space row(v) matches bold(P) : row(tau) $
 Let us denote this property $cal(E)_(row(tau))(bold(P))$
 
-In order to solve pattern-matching exhaustivity, we answer a more general problem : _pattern usefulness_. For a type row $row(tau)$, and two matrices $bold(P)$ and $bold(Q)$, it is denoted $cal(U)_(row(tau))(bold(P), bold(Q))$ and asks whether the matrix $bold(Q)$ is "useful" next to $bold(P)$, i.e. does it catch any value row that did not match $bold(P)$. Formally :
+In order to solve pattern-matching exhaustivity, we answer a more general problem : _pattern usefulness_. For a type row $row(tau)$, and two matrices $bold(P)$ and $bold(Q)$, it is denoted $cal(U)_(row(tau))(bold(P), bold(Q))$ and asks whether the matrix $bold(Q)$ is "useful" next to $bold(P)$, i.e. if it catches any value row that do not match $bold(P)$. Formally :
 $
   cal(U)_(row(tau))(bold(P), bold(Q)) := exists row(v) : row(tau) | row(v) matches bold(Q) : row(tau) "and" row(v) mismatches bold(P) : row(tau)
 $
@@ -376,7 +406,7 @@ $
 which can be restated as :
 $cal(U)_(row(tau))(bold(P), bold(Q)) <==> sem(bold(Q), row(tau)) \\ sem(bold(P), row(tau)) != empty$.
 
-Pattern-matching exhaustivity is now a special case of usefulness : $bold(P)$ is exhaustive iff $omegas(n)$ is useless w.r.t $bold(P)$.
+Pattern-matching exhaustivity is now a special case of usefulness : $bold(P)$ is exhaustive iff $omegas(n)$ is useless with respect to $bold(P)$.
 $
   cal(E)_(row(tau))(bold(P)) space & <==> space not cal(U)_(row(tau))(bold(P), omegas(n)) \
                                    & <==> space sem(bold(P), row(tau)) = sem(omegas(n), row(tau))
@@ -402,38 +432,38 @@ Thanks to our decomposition lemmas, we can derive an algorithm to determine whet
       &= union.sq.big_(A in S(bold(P)) union S(bold(Q))) sem(A(bold(Q) slash A), row(tau)) \\ sem(A(bold(P) slash A), row(tau))
     $
 
-  hence usefulness is rewritten as :
-  $
-    cal(U)_row(tau)(bold(P), bold(Q)) <==> or.big_(A in S(bold(P)) union S(bold(Q))) cal(U)_(row(tau) slash A)(bold(P) slash A, bold(Q) slash A)
-  $
+    hence usefulness is rewritten as :
+    $
+      cal(U)_row(tau)(bold(P), bold(Q)) <==> or.big_(A in S(bold(P)) union S(bold(Q))) cal(U)_(row(tau) slash A)(bold(P) slash A, bold(Q) slash A)
+    $
 
-  Otherwise, we need one extra term taking into account constructors that do not appear in $bold(P)$ or $bold(Q)$. It can be obtained by simply removing the first column, but it can also be thought of specializing by a fresh constructor of arity 0. For this reason, we introduce the notation $bold(P) slash omega$ to do exactly this, hence :
-  // $
-  //   sem(bold(Q), row(tau)) \\ sem(bold(P), row(tau))
-  //   &= union.sq.big_(A in S(bold(P)) union S(bold(Q))) sem(A(bold(Q) slash A), row(tau)) \\ sem(A(bold(P) slash A), row(tau)) #h(1em) union.sq #h(1em) sem(E(bold(Q) slash E), row(tau)) \\ sem(E(bold(P) slash E), row(tau))
-  // $
+    Otherwise, we need one extra term taking into account constructors that do not appear in $bold(P)$ or $bold(Q)$. It can be obtained by simply removing the first column, but it can also be thought of specializing by a fresh constructor of arity 0. For this reason, we introduce the notation $bold(P) slash omega$ to do exactly this, hence :
 
   // which gives
   $
     cal(U)_row(tau)(bold(P), bold(Q)) <==> or.big_(A in S(bold(P)) union S(bold(Q))) cal(U)_(row(tau) slash A)(bold(P) slash A, bold(Q) slash A) #h(1em) or #h(1em) cal(U)_(row(tau) slash omega)(bold(P) slash omega, bold(Q) slash omega)
   $
 
-  At this point, we have a recursive algorithm, but there may be an optimization we can incorporate into this last case, which consists in performing less recursive calls. The idea is to only specialize against constructors which appear in $bold(Q)$ or _strictly negatively_ in $bold(P)$. Indeed, we need not to specialize against those who appear positively, since we already know that the signature is incomplete, and so the usefulness check may yield true anyway when specializing "by $omega$". It is still required however to specialize against strictly negative constructors, since they may omit a value that could still be useful to $bold(P)$. Consider the following matrix $bold(P)$ as an example.
-  $ bold(P) = mat(1; not 2) $
-  By definition, we know that $cal(U)_#raw("int") (bold(P), 2)$ is true, since $2$ is unmatched by $P$. Our initial decomposition lemma tells us to perform three recursive calls, specializing by $1$, $2$ and $omega$ respectively :
-  $
-    cal(U)_#raw("int") (bold(P), 2) space <==> space underbrace(cal(U)_unit (unit, empty), slash 1) space or space underbrace(cal(U)_unit (empty, unit), slash 2) space or space underbrace(cal(U)_unit (unit, unit), slash omega)
-  $
-  Observe how the result equals $top$ because of the one recursive call specializing by constructor $2$. And if there are no strictly negative constructors, then we have for instance
-  $
-    cal(U)_#raw("int") (mat(1; 2), 3) space <==> space underbrace(cal(U)_unit (empty, unit), slash omega) space <==> space top
-  $
-  with no need for other recursive calls, because the signature is incomplete, which means we can restrain our search to the default matrix.
+== Eliminating useless recursive calls
 
-  *Conjecture (optimized recursive case with pattern-negation)*
-  $
-    cal(U)_row(tau)(bold(P), bold(Q)) <==> or.big_(A in S(bold(Q)) union (S^-(bold(P)) \\ S^+(bold(Q)))) cal(U)_(row(tau) slash A)(bold(P) slash A, bold(Q) slash A) #h(1em) or #h(1em) cal(U)_(row(tau) slash omega)(bold(P) slash omega, bold(Q) slash omega)
-  $
+At this point, we have a recursive algorithm, but there may be an optimization we can incorporate into this last case, which consists in performing less recursive calls. The idea is to only specialize against constructors which appear in $bold(Q)$ or _strictly negatively_ in $bold(P)$. Indeed, we need not to specialize against those who appear positively, since we already know that the signature is incomplete, and so the usefulness check may yield true anyway when specializing "by $omega$". It is still required however to specialize against strictly negative constructors, since they may omit a value that could still be useful to $bold(P)$. Consider the following matrix $bold(P)$ as an example.
+$ bold(P) = mat(1; not 2) $
+By definition, we know that $cal(U)_#raw("int") (bold(P), 2)$ is true, since $2$ is unmatched by $P$. Our initial decomposition lemma tells us to perform three recursive calls, specializing by $1$, $2$ and $omega$ respectively :
+$
+  cal(U)_#raw("int") (bold(P), 2) space <==> space underbrace(cal(U)_unit (unit, empty), slash 1) space or space underbrace(cal(U)_unit (empty, unit), slash 2) space or space underbrace(cal(U)_unit (unit, unit), slash omega)
+$
+Observe how the result equals $top$ because of the one recursive call specializing by constructor $2$. And if there are no strictly negative constructors, then we have for instance
+$
+  cal(U)_#raw("int") (mat(1; 2), 3) space <==> space underbrace(cal(U)_unit (empty, unit), slash omega) space <==> space top
+$
+with no need for other recursive calls, because the signature is incomplete _and_ we are not omitting a constructor in $bold(P)$ (there are no strictly negative constructors), which means we can restrain our search to the default matrix. We did not show the equivalence between usefulness and this smaller sum.
+
+*Conjecture (optimized recursive case with pattern-negation)*
+$
+  cal(U)_row(tau)(bold(P), bold(Q)) <==> or.big_(A in S(bold(Q)) union (S^-(bold(P)) \\ S^+(bold(Q)))) cal(U)_(row(tau) slash A)(bold(P) slash A, bold(Q) slash A) #h(1em) or #h(1em) cal(U)_(row(tau) slash omega)(bold(P) slash omega, bold(Q) slash omega)
+$
+
+The code in our prototype implementation uses this conjecture to check pattern-matching exhaustivity.
 
 = Final remarks
 
@@ -489,10 +519,70 @@ Speaking of compilation, we have yet to look into how the compilation of not-pat
 
 Not patterns can sometimes by thrown at the bottom of a match when they handle a special "error" case, and under this form, the already optimized #ocaml pattern matching compilation algorithms could take over, if the lowered match expression doesn't grow too large in size.
 
-== Different approaches to the problem
+== A different approach to the problem
 
-TODO: Generalization, preorder $p >= q$ on patterns? 
+Our initial leading idea in the internship was to notice that values as described here are a strict subset of patterns, prompting us to extend the matching relation $v matches p$ to a more general preorder relation $p subset.eq q$ between patterns, defined by :
+$ p subset.eq q #h(1em) #text[*iff*] #h(1em) forall v, (v matches p ==> v matches q) $
 
-= Appendix : context of the internship
+This relation can intuitively be thought of as $p$ being _included_ in $q$, or $q$ being more _general_ than $p$. As such, the exhaustiveness of a pattern $p$ could thus be obtained by proving something like $omega subset.eq p$, meaning every value matches $p$. Working with such a relation was an interesting idea because it is indeed used in the #ocaml compiler for pattern-matching optimization; see @maranget_lefessant_optim. We attempted to give a syntactic inductive definition for the relation $p subset.eq q$, but it became obvious that it would be too hard. The main issue we ran into was trying to gave inference rules for $p subset.eq q_1 or q_2$ in the special case where we had neither $p subset.eq q_1$ nor $p subset.eq q_2$, as drawn in the following diagram.
 
-TODO: Picube, INRIA & IRIF
+#align(center)[
+  #cetz.canvas({
+    import cetz.draw: *
+
+    let r = 1.75
+    let dist = 1.0
+
+    circle(
+      (-dist, 0),
+      radius: r,
+      stroke: 1.5pt + rgb("#2b5c8f"),
+      fill: rgb("#2b5c8f35"),
+    )
+
+    circle(
+      (dist, 0),
+      radius: r,
+      stroke: 1.5pt + rgb("#d9534f"),
+      fill: rgb("#d9534f35"),
+    )
+
+    circle(
+      (0, 0),
+      radius: 1.2,
+      stroke: (dash: "dashed", paint: rgb("#2e7d32"), thickness: 1.5pt),
+      fill: rgb("#2e7d3245"),
+    )
+
+    content((-dist - 0.56, 0.8), text(fill: rgb("#2b5c8f"), weight: "bold", size: 14pt)[*$q_1$*])
+    content((+dist + 0.5, 0.8), text(fill: rgb("#d9534f"), weight: "bold", size: 14pt)[*$q_2$*])
+    content((0, 0), text(fill: rgb("#1b5e20"), weight: "bold", size: 14pt)[*$p$*])
+  })
+]
+
+Other quirks were encountered in the presence of pattern negation. Intuitively, the proposition $not p subset.eq q$ should be equivalent to $not q subset.eq p$, because the two patterns $p$ and $q$ are incompatible (they have no matching value in common). In @MARANGET_2007 and @maranget_lefessant_optim, incompatibility is written $p space hash space q$. Adding this relation into the mix, proving basic results in a formal proof assistant such as the transitivity of $subset.eq$ became very hard.
+
+#pagebreak()
+= Appendix -- context of the internship
+
+The internship was welcomed within the Picube team of Inria (Institut National de Recherche en Informatique et en Automatique). The team strongly focuses on formal proof assistants and verification, and works in collaboration with IRIF (Institut de Recherche en Informatique Fondamentale), as well as CNRS and the Paris-Cité University.
+
+#columns(4)[
+  #v(1cm)
+  #image("assets/inr_logo_rouge.png")
+
+  #colbreak()
+
+  #v(0.65cm)
+  #image("assets/Logo-irif.png")
+
+  #colbreak()
+
+  #v(1cm)
+  #image("assets/UniversiteParisCite_logo_horizontal_couleur_CMJN.jpg")
+
+  #colbreak()
+
+  #v(0.20cm)
+  #image("assets/LOGO_CNRS_BLEU.png")
+]
