@@ -4,8 +4,10 @@
 #import "@preview/xarrow:0.4.0": *
 #import "@preview/cetz:0.5.2"
 
+#let ocaml = smallcaps("OCaml")
+
 #show: report.with(
-  title: [Adding pattern negation to ML-like matching],
+  title: [Adding pattern negation to pattern-matching expressions in #ocaml],
   student: "---",
   supervisor: "---",
   date: "05/01/26 - 07/13/26",
@@ -424,13 +426,16 @@ Now, we obtain a more expressive decomposition theorem to partition the set of v
 The _pattern-matching exhaustivity_ problem goes as follows: for a pattern matrix $bold(P)$ and a types $row(tau)$, do we have the following property? $ forall row(v), space row(v) : row(tau) space ==> space row(v) matches bold(P) : row(tau) $
 Let us denote this property $cal(E)_(row(tau))(bold(P))$
 
-In order to solve pattern-matching exhaustivity, we answer a more general problem: _pattern usefulness_. For a type row $row(tau)$, and two matrices $bold(P)$ and $bold(Q)$, it is denoted $cal(U)_(row(tau))(bold(P), bold(Q))$ and asks whether the matrix $bold(Q)$ is "useful" next to $bold(P)$, i.e. if it catches any value row that do not match $bold(P)$. Formally:
-$
-  cal(U)_(row(tau))(bold(P), bold(Q)) := exists row(v) : row(tau), space row(v) matches bold(Q) : row(tau) "and" row(v) mismatches bold(P) : row(tau)
-$
+In order to solve pattern-matching exhaustivity, we answer a more general problem: _pattern usefulness_.
 
-which can be restated as:
-$cal(U)_(row(tau))(bold(P), bold(Q)) <==> sem(bold(Q), row(tau)) \\ sem(bold(P), row(tau)) != empty$.
+#showybox[
+  *Definition.* For a type row $row(tau)$, and two matrices $bold(P)$ and $bold(Q)$, it is denoted $cal(U)_(row(tau))(bold(P), bold(Q))$ and asks whether the matrix $bold(Q)$ is "useful" next to $bold(P)$, i.e. if it catches any value row that do not match $bold(P)$. Formally:
+  $
+    cal(U)_(row(tau))(bold(P), bold(Q)) := exists row(v) : row(tau), space row(v) matches bold(Q) : row(tau) "and" row(v) mismatches bold(P) : row(tau)
+  $
+
+  which can be restated as: $space cal(U)_(row(tau))(bold(P), bold(Q)) <==> sem(bold(Q), row(tau)) \\ sem(bold(P), row(tau)) != empty$.
+]
 
 Pattern-matching exhaustivity is now a special case of usefulness: $bold(P)$ is exhaustive iff $omegas(n)$ is useless with respect to $bold(P)$.
 $
@@ -439,7 +444,30 @@ $
 $
 
 These two defintions come directly from @MARANGET_2007 (adapted to our notations), a major distiction: in our version, $bold(Q)$ is a matrix, where is used to be a single row $row(q)$ in the original article. We chose to introduce matrices directly as we believed they would directly translate to a more efficient algorithm. That being said, the original paper does explore a different way to compute this property with a more optimized approach we won't be going over in this report.
- Pattern usefulness comes as a convenient generalization when we need to check whether a clause in a #ml("match") expression is redundant: we simply ask said clause is useful with respect to the matrix that precedes it: if not then it is redundant.
+Pattern usefulness comes as a convenient generalization when we need to check whether a clause in a #ml("match") expression is redundant: we simply ask said clause is useful with respect to the matrix that precedes it: if not then it is redundant.
+
+As we have seen in previous sections, pattern negation also introduces impossible patterns, like $not omega$. It will be necessary to detect whether we have such patterns on our hands, so for any pattern $p$ and type $tau$ we need a predicate $cal(I)_(tau)(p)$ which tells whether $p$ is impossible within type $tau$. This predicate shall be computed with syntactic rules.
+
+#showybox[
+  *Definition (impossibility)*. We define $cal(I)_tau (p)$ for any pattern $p$ and type $tau$ by induction, then we extend it to rows with the syntax $cal(I)_row(tau) (row(p))$.
+  $
+    cal(I)_tau (omega) &= (exists (A "of" row(tau_i)) in sig(tau), space cal(I)_row(tau_i) (omega space dots space omega) = top) \
+    cal(I)_tau (A(row(p_i))) &= cal(I)_(row(tau_i)) (row(p_i)) "   for all" (A "of" row(tau_i)) in sig(tau) \
+    cal(I)_tau (p_1 or p_2) &= cal(I)_tau (p_1) and cal(I)_tau (p_2) \
+    cal(I)_tau (p_1 and p_2) &= cal(I)_tau (p_1) or cal(I)_tau (p_2) \
+    cal(I)_tau (not p) &= cal(E)_tau (p)
+    \ \
+    cal(I)_mat(tau_1, dots, tau_n)(p_1 space dots space p_n) &= cal(I)_(tau_1) (p_1) or space dots space or cal(I)_(tau_n) (p_n)
+  $
+]
+
+When $p=p_1 or p_2$, we need _both_ $p_1$ and $p_2$ to be impossible for the whole pattern to be guaranteed impossible. Conversely, $p_1 and p_2$ is impossible if either $p_1$ or $p_2$ is impossible. The case for the constructor pattern is also similar to pattern conjunction : one of the arguments must be impossible, so we use disjunction across recursive calls. Interestingly enough, the two base cases are the most interesting:
+- if $p=omega$, then we have no other choice but to ask the type-checker for some help. We are essentially answering the question "is $tau$ empty?" which can be done by looking for a constructor in its signature that has impossible type arguments.
+- if $p = not q$, then $p$ is impossible if and only if $q$ is exhaustive, therefore we have call to the exhaustivity problem on $q$. We will notice later that usefulness and impossibility are thus mutually recursive.
+
+Impossibility is naturally extended on matrices: the matrix $bold(Q)$ is impossible within types $row(tau)$ is _all_ of its rows are impossible. Finally, we have a lemma which links impossibility to the set-theoric interpretation of patterns.
+
+*Lemma.* For any matrix $Q$ and type row $row(tau)$, we have $ sem(bold(Q), row(tau)) = empty space <==> space cal(I)_row(tau)(bold(Q)) $
 
 == Computing the solution
 
@@ -447,7 +475,9 @@ Thanks to our decomposition lemmas, we can derive an algorithm to determine whet
 
 - There are two "easy" base cases:
   - if $bold(P) = empty$ (no rows), then no value is forbidden, and we need to ensure that there exists a row in $bold(Q)$ that matches at least one value. In short, we say
-  $ cal(U)_(row(tau))(empty, bold(Q)) <==> sem(bold(Q), row(tau)) != empty $
+    $ cal(U)_(row(tau))(empty, bold(Q)) <==> sem(bold(Q), row(tau)) != empty <==> not cal(I)_(row(tau)) (bold(Q)) $
+
+    which is easily handled by computing the impossibility predicate on $bold(Q)$ (and taking its negation). Notice how this makes usefulness and impossibility two mutually recursive algorithms.
 
   - if $bold(P)$ and $bold(Q)$ are of width zero (they are unit matrices) and $bold(P) != empty$, then $sem(bold(P), unit) = sem(omegas(0), unit)$, thus $bold(P)$ is exhaustive and $bold(Q)$ can match no more (unit) values. Hence: $ cal(U)_(row(tau))(unit, unit) <==> bot $
 
@@ -590,15 +620,16 @@ Other quirks were encountered in the presence of pattern negation. Intuitively, 
 
 = Conclusion
 
-bla bla
+By drawing from the existing work on pattern-matching analysis and compilation, we are able to extend #ocaml\-like #ml("match") expressions with a negation pattern #ml("not(p)"). The preestablished analysis techniques, especially from the canonical paper reference for #ocaml pattern-matching @MARANGET_2007, naturally translate to our extension, and we are able to describe a similar algorithm for validating or refuring the exhaustivity of a pattern-matching expression. We are also able to treat empty types and impossible patterns introduced by negation, as our algorithm is now able to detect whether a #ml("match") is trivially exhaustive, for we have successfully embedded a pseudo type-system into our matching semantics.
 
+There are multiple directions one may choose to take from there. While some practical work was done to explore compilation of pattern negation in #ocaml, we have not formalized it, nor have we looked into any optimizations. Future studies on optimization of pattern negation would be beneficial if the feature were to be fully implemented in #ocaml and accepted altogether in the official GitHub repository.Another possibility not discussed in this report is being able to talk about patterns on _generalized algebraic data types_ (GADTs) @garrigue2011adding. The #ocaml compiler does handle GADTs in pattern-matching analysis, however it introduces a lot of complications. For instance, when the compiler tries to generate counter-example candidates after a failed exhaustivity check, it needs to run the type-checker on each and every one of them to rule out those who are ill-typed. This does not need to happen with regular algebraic data types, because syntactically generating well-typed patterns is easy.
+
+Formal proofs in a proof assistant like #rocq or #smallcaps[Lean] would also be appreciated; the ones we achieved during the internship are a promising start, however most of the lemmas stated in the section on exhaustivity and usefulness were not yet formally proven. Nevertheless, testing our intuition with a proof assistant was definitely of great help during the internship.
 
 #counter(heading).update(0)
 #set heading(numbering: "A.")
 
 = Appendix -- context of the internship
-
-The internship was welcomed within the Picube team of Inria (Institut National de Recherche en Informatique et en Automatique). The team strongly focuses on formal proof assistants and verification, and works in collaboration with IRIF (Institut de Recherche en Informatique Fondamentale), as well as CNRS and the Paris-Cité University.
 
 #columns(4)[
   #v(1cm)
@@ -619,3 +650,7 @@ The internship was welcomed within the Picube team of Inria (Institut National d
   #v(0.20cm)
   #image("assets/LOGO_CNRS_BLEU.png")
 ]
+
+I was welcomed on June 1st by the PICUBE team of INRIA (Institut National de Recherche en Informatique et en Automatique). The team works in collaboration with IRIF (Institut de Recherche en Informatique Fondamentale), as well as CNRS and the Paris-Cité university. PICUBE's main focus is on formal proof assistants and verification, with the main objective of facilitating the formalization of mathematical statements, thanks to recent breakthroughs in type theory and other connected fields of study. Moreover, the researchers work in close cooperation with other INRIA teams, namely CAMBIUM and PI.R2, who are most know for maintaining the #ocaml and #rocq software respectively. A notable recent result is the description and implementation of the `tail-modulo-cons` porogram transformer in #ocaml, in conjunction with a formal proof of its correctness in #rocq @allain:hal-04884634.
+
+Despite the internship's short duration, my overall impression I get from my stay with the PICUBE team is very positive, for it was a great introduction to the world of research. The opportunity to chat with other researchers as well as other interns was definitely beneficial in that regard. I have been very grateful to work with the people who actively maintain the #ocaml software, given the internship subject is closely related to the language: being able to dive into and hack the compiler with the help of Gabriel (who now serves as director of the _#ocaml Software Foundation_) couldn't have been a greater honor. In addition, I was also able to pay a visit to the CAMBIUM team in the INRIA Paris centre and discuss specifics with Luc Maranget, the author of the main reference paper used throughout the internship.

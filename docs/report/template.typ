@@ -38,7 +38,12 @@
 
       // // ---------------------------------- ENS de Lyon logo
       v(1cm)
-      image("assets/ens_lyon.png", width:25%)
+      columns(2)[
+        #v(1.25cm)
+        #image("assets/ens_lyon.png", width: 70%)
+        #colbreak()
+        #image("assets/Logo_L1Ucb.png", width: 50%)
+      ]
 
       // ---------------------------------- People
       v(1fr)
