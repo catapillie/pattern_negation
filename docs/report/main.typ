@@ -513,12 +513,16 @@ $
 $
 with no need for other recursive calls, because the signature is incomplete _and_ we are not omitting a constructor in $bold(P)$ (there are no strictly negative constructors), which means we can restrain our search to the default matrix. We did not show the equivalence between usefulness and this smaller sum.
 
-*Conjecture (optimized recursive case with pattern-negation)*
-$
-  cal(U)_row(tau)(bold(P), bold(Q)) <==> or.big_(A in S(bold(Q)) union (S^-(bold(P)) \\ S^+(bold(Q)))) cal(U)_(row(tau) slash A)(bold(P) slash A, bold(Q) slash A) #h(1em) or #h(1em) cal(U)_(row(tau) slash omega)(bold(P) slash omega, bold(Q) slash omega)
-$
+#showybox[
+  *Conjecture (optimized recursive case with pattern-negation)*
 
-The code in our prototype implementation uses this conjecture to check pattern-matching exhaustivity.
+  For any matrix $bold(P) != empty$ and $bold(Q)$ containing one or more columns, and any $row(tau)$, we can compute the usefulness property $cal(U)_row(tau)(bold(P), bold(Q))$ within the type row $row(tau)$ using the finite sum below.
+  $
+    cal(U)_row(tau)(bold(P), bold(Q)) <==> or.big_(A in S(bold(Q)) union (S^-(bold(P)) \\ S^+(bold(Q)))) cal(U)_(row(tau) slash A)(bold(P) slash A, bold(Q) slash A) #h(1em) or #h(1em) cal(U)_(row(tau) slash omega)(bold(P) slash omega, bold(Q) slash omega)
+  $
+]
+
+The code in our prototype implementation uses this conjecture to check pattern-matching exhaustivity in an effort to obtain better performance results.
 
 = Final remarks
 
