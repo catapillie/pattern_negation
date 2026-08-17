@@ -65,7 +65,6 @@
 
   doc
 
-  pagebreak()
   bibliography("references.bib", style: "./gasche-author-date.csl")
 
 }
